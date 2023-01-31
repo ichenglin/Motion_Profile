@@ -1,5 +1,4 @@
 #include <map>
-#include <array>
 #include <cmath>
 #include "motion_profile_sigmoid.h"
 
@@ -14,12 +13,7 @@ SigmoidMotionProfile::SigmoidMotionProfile(float distance_total, float velocity_
 	// calculate phase time
 	this->phase_anchors           = sigmoid_phase_anchors(distance_total, velocity_max, acceleration_max, jerk);
 	this->acceleration_max_actual = this->jerk * this->phase_anchors.at(SigmoidPhase::ACCELERATE_BEGIN).time_phase_end;
-	this->velocity_max_actual = this->sigmoid_value(SigmoidParameter::VELOCITY, this->phase_anchors.at(SigmoidPhase::ACCELERATE_END).time_phase_end);
-	// debug
-	for (int i = 0; i < 7; i++) {
-		printf("[Phase #%d] Time: %f End: %f Distance: %f Velocity: %f\n", i, this->phase_anchors.at((SigmoidPhase) i).time_phase_section, this->phase_anchors.at((SigmoidPhase) i).time_phase_end, this->get_distance(this->phase_anchors.at((SigmoidPhase)i).time_phase_end) - this->get_distance(this->phase_anchors.at((SigmoidPhase)i).time_phase_begin), this->get_velocity(this->phase_anchors.at((SigmoidPhase)i).time_phase_end));
-	}
-	printf("\nVelocity Max: %f\nAcceleration Max: %f\n", velocity_max_actual, acceleration_max_actual);
+	this->velocity_max_actual     = this->sigmoid_value(SigmoidParameter::VELOCITY, this->phase_anchors.at(SigmoidPhase::ACCELERATE_END).time_phase_end);
 }
 
 float SigmoidMotionProfile::get_distance(float progress_time) {
