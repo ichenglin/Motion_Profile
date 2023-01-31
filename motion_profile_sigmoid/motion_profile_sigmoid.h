@@ -28,14 +28,16 @@ public:
 	};
 
 	SigmoidMotionProfile(float distance_total, float velocity_max, float acceleration_max, float jerk);
-	float get_distance();
+	float get_distance(float progress_time);
 	float get_velocity(float progress_time);
 	float get_acceleration(float progress_time);
-	float get_jerk();
+	float get_jerk(float progress_time);
 	float get_time_end();
+	SigmoidPhase get_phase(float progress_time);
 private:
 	float distance_total;
 	float velocity_max;
+	float velocity_max_actual;
 	float acceleration_max;
 	float acceleration_max_actual;
 	float jerk;

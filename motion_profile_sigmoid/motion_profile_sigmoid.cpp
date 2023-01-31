@@ -13,6 +13,16 @@ SigmoidMotionProfile::SigmoidMotionProfile(float distance_total, float velocity_
 	// calculate phase time
 	this->phase_anchors           = sigmoid_phase_anchors(distance_total, velocity_max, acceleration_max, jerk);
 	this->acceleration_max_actual = this->jerk * this->phase_anchors.at(SigmoidPhase::ACCELERATE_BEGIN).time_phase_end;
+	this->velocity_max_actual = this->sigmoid_value(SigmoidParameter::VELOCITY, this->phase_anchors.at(SigmoidPhase::ACCELERATE_END).time_phase_end);
+	// debug
+	for (int i = 0; i < 7; i++) {
+		printf("[Phase #%d] Time: %f End: %f\n", i, this->phase_anchors.at((SigmoidPhase) i).time_phase_section, this->phase_anchors.at((SigmoidPhase) i).time_phase_end);
+	}
+	printf("\nVelocity Max: %f\n", velocity_max_actual);
+}
+
+float SigmoidMotionProfile::get_distance(float progress_time) {
+	return this->sigmoid_value(SigmoidParameter::DISTANCE, progress_time);
 }
 
 float SigmoidMotionProfile::get_velocity(float progress_time) {
@@ -21,6 +31,17 @@ float SigmoidMotionProfile::get_velocity(float progress_time) {
 
 float SigmoidMotionProfile::get_acceleration(float progress_time) {
 	return this->sigmoid_value(SigmoidParameter::ACCELERATION, progress_time);
+}
+
+float SigmoidMotionProfile::get_jerk(float progress_time) {
+	return this->sigmoid_value(SigmoidParameter::JERK, progress_time);
+}
+
+SigmoidMotionProfile::SigmoidPhase SigmoidMotionProfile::get_phase(float progress_time) {
+	for (int phase_index = 6; phase_index >= 0; phase_index--) {
+		if (this->phase_anchors.at((SigmoidPhase)phase_index).time_phase_begin > progress_time) continue;
+		return (SigmoidPhase)phase_index;
+	}
 }
 
 float SigmoidMotionProfile::get_time_end() {
@@ -38,32 +59,62 @@ float SigmoidMotionProfile::sigmoid_value(SigmoidParameter sigmoid_parameter, fl
 		break;
 	}
 	// return phase values
-	switch (sigmoid_parameter) {
-		case SigmoidParameter::VELOCITY: {
-			float velocity_phase_accumulate = 0.0f;
-			for (int phase_index = 0; phase_index <= (int) progress_phase; phase_index++) {
-				float time_phase_section = (phase_index != (int) progress_phase ? this->phase_anchors.at((SigmoidPhase)phase_index).time_phase_section : time_progress_section);
-				if      (phase_index == (int)SigmoidPhase::ACCELERATE_BEGIN)   velocity_phase_accumulate += (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
-				else if (phase_index == (int) SigmoidPhase::ACCELERATE_RETAIN) velocity_phase_accumulate += this->acceleration_max_actual * time_phase_section;
-				else if (phase_index == (int) SigmoidPhase::ACCELERATE_END)    velocity_phase_accumulate += this->acceleration_max_actual * time_phase_section - (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
-				else if (phase_index == (int) SigmoidPhase::DRIFT)             velocity_phase_accumulate += 0.0f;
-				else if (phase_index == (int) SigmoidPhase::DECELERATE_BEGIN)  velocity_phase_accumulate -= (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
-				else if (phase_index == (int) SigmoidPhase::DECELERATE_RETAIN) velocity_phase_accumulate -= this->acceleration_max_actual * time_phase_section;
-				else if (phase_index == (int) SigmoidPhase::DECELERATE_END)    velocity_phase_accumulate -= this->acceleration_max_actual * time_phase_section - (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
-			}
-			return velocity_phase_accumulate;
-			break;
+	float value_phase_accumulate = 0.0f;
+	bool  parameter_type_accumulate = sigmoid_parameter == SigmoidParameter::VELOCITY || sigmoid_parameter == SigmoidParameter::DISTANCE;
+	for (int phase_index = (!parameter_type_accumulate ? (int) progress_phase : 0); phase_index <= (int) progress_phase; phase_index++) {
+		// phase progress time
+		SigmoidPhaseAnchors phase_object = this->phase_anchors.at((SigmoidPhase) phase_index);
+		float time_phase_section = (phase_index != (int)progress_phase ? phase_object.time_phase_section : time_progress_section);
+		// phase equations
+		switch ((SigmoidPhase) phase_index) {
+			case SigmoidPhase::ACCELERATE_BEGIN:
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    this->jerk;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    this->jerk * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate += (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3);
+				break;
+			case SigmoidPhase::ACCELERATE_RETAIN:
+				if (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    this->acceleration_max_actual;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate += this->acceleration_max_actual * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (1 / 2.0f) * this->acceleration_max_actual * std::pow(time_phase_section, 2);
+				break;
+			case SigmoidPhase::ACCELERATE_END:
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    (-1) * this->jerk;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    this->acceleration_max_actual - this->jerk * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate += this->acceleration_max_actual * time_phase_section - (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (-1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3) + (1 / 2.0f) * this->acceleration_max_actual * std::pow(time_phase_section, 2);
+				break;
+			case SigmoidPhase::DRIFT:
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    0.0f;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate += 0.0f;
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += this->velocity_max_actual * time_phase_section;
+				break;
+			case SigmoidPhase::DECELERATE_BEGIN:
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    (-1) * this->jerk;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    (-1) * this->jerk * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate -= (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3);
+				break;
+			case SigmoidPhase::DECELERATE_RETAIN:
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    (-1) * this->acceleration_max_actual;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate -= this->acceleration_max_actual * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate -= (1 / 2.0f) * this->acceleration_max_actual * std::pow(time_phase_section, 2);
+				break;
+			case SigmoidPhase::DECELERATE_END:
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    this->jerk;
+				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    (-1) * this->acceleration_max_actual + this->jerk * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate -= this->acceleration_max_actual * time_phase_section - (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate -= (-1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3) + (1 / 2.0f) * this->acceleration_max_actual * std::pow(time_phase_section, 2);
+				break;
 		};
-		case SigmoidParameter::ACCELERATION:
-			if (progress_phase == SigmoidPhase::ACCELERATE_BEGIN)  return this->jerk * time_progress_section;
-			if (progress_phase == SigmoidPhase::ACCELERATE_RETAIN) return this->acceleration_max_actual;
-			if (progress_phase == SigmoidPhase::ACCELERATE_END)    return this->acceleration_max_actual - this->jerk * time_progress_section;
-			if (progress_phase == SigmoidPhase::DRIFT)             return 0.0f;
-			if (progress_phase == SigmoidPhase::DECELERATE_BEGIN)  return (-1) * this->jerk * time_progress_section;
-			if (progress_phase == SigmoidPhase::DECELERATE_RETAIN) return (-1) * this->acceleration_max_actual;
-			if (progress_phase == SigmoidPhase::DECELERATE_END)    return (-1) * (this->acceleration_max_actual - this->jerk * time_progress_section);
-			break;
+		if (sigmoid_parameter == SigmoidParameter::DISTANCE) {
+			value_phase_accumulate += this->sigmoid_value(SigmoidParameter::VELOCITY, phase_object.time_phase_begin) * time_phase_section;
+		}
 	}
+	return value_phase_accumulate;
 }
 
 std::map<SigmoidMotionProfile::SigmoidPhase, SigmoidMotionProfile::SigmoidPhaseAnchors> sigmoid_phase_anchors(float distance_total, float velocity_max, float acceleration_max, float jerk) {
