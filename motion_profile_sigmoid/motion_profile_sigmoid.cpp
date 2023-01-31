@@ -16,9 +16,9 @@ SigmoidMotionProfile::SigmoidMotionProfile(float distance_total, float velocity_
 	this->velocity_max_actual = this->sigmoid_value(SigmoidParameter::VELOCITY, this->phase_anchors.at(SigmoidPhase::ACCELERATE_END).time_phase_end);
 	// debug
 	for (int i = 0; i < 7; i++) {
-		printf("[Phase #%d] Time: %f End: %f\n", i, this->phase_anchors.at((SigmoidPhase) i).time_phase_section, this->phase_anchors.at((SigmoidPhase) i).time_phase_end);
+		printf("[Phase #%d] Time: %f End: %f Distance: %f\n", i, this->phase_anchors.at((SigmoidPhase) i).time_phase_section, this->phase_anchors.at((SigmoidPhase) i).time_phase_end, this->get_distance(this->phase_anchors.at((SigmoidPhase)i).time_phase_end) - this->get_distance(this->phase_anchors.at((SigmoidPhase)i).time_phase_begin));
 	}
-	printf("\nVelocity Max: %f\n", velocity_max_actual);
+	printf("\nVelocity Max: %f\nAcceleration Max: %f\n", velocity_max_actual, acceleration_max_actual);
 }
 
 float SigmoidMotionProfile::get_distance(float progress_time) {
@@ -74,7 +74,7 @@ float SigmoidMotionProfile::sigmoid_value(SigmoidParameter sigmoid_parameter, fl
 				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3);
 				break;
 			case SigmoidPhase::ACCELERATE_RETAIN:
-				if (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
+				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
 				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    this->acceleration_max_actual;
 				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate += this->acceleration_max_actual * time_phase_section;
 				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (1 / 2.0f) * this->acceleration_max_actual * std::pow(time_phase_section, 2);
@@ -89,13 +89,13 @@ float SigmoidMotionProfile::sigmoid_value(SigmoidParameter sigmoid_parameter, fl
 				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
 				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    0.0f;
 				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate += 0.0f;
-				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += this->velocity_max_actual * time_phase_section;
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += 0.0f;
 				break;
 			case SigmoidPhase::DECELERATE_BEGIN:
 				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    (-1) * this->jerk;
 				else if (sigmoid_parameter == SigmoidParameter::ACCELERATION) return                    (-1) * this->jerk * time_phase_section;
 				else if (sigmoid_parameter == SigmoidParameter::VELOCITY)     value_phase_accumulate -= (1 / 2.0f) * this->jerk * std::pow(time_phase_section, 2);
-				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate += (1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3);
+				else if (sigmoid_parameter == SigmoidParameter::DISTANCE)     value_phase_accumulate -= (1 / 6.0f) * this->jerk * std::pow(time_phase_section, 3);
 				break;
 			case SigmoidPhase::DECELERATE_RETAIN:
 				if      (sigmoid_parameter == SigmoidParameter::JERK)         return                    0.0f;
@@ -136,24 +136,25 @@ std::map<SigmoidMotionProfile::SigmoidPhase, SigmoidMotionProfile::SigmoidPhaseA
 	}
 	float acceleration_max_actual = jerk * phases_time_accelerate[0];
 	// first integration (velocity) of each phases' acceleration
-	float phases_velocity_accelerate[3] = {
-		(1 / 2.0f) * jerk             * std::pow(phases_time_accelerate[0], 2),
-		acceleration_max_actual       * phases_time_accelerate[1],
-		(1 / 2.0f) * jerk             * std::pow(phases_time_accelerate[2], 2),
-	};
+	float phases_velocity_accelerate[3];
+	phases_velocity_accelerate[0] = 0                             + (1 / 2.0f) * jerk       * std::pow(phases_time_accelerate[0], 2);
+	phases_velocity_accelerate[1] = phases_velocity_accelerate[0] + acceleration_max_actual * phases_time_accelerate[1];
+	phases_velocity_accelerate[2] = phases_velocity_accelerate[1] - (1 / 2.0f) * jerk       * std::pow(phases_time_accelerate[2], 2) + acceleration_max_actual * phases_time_accelerate[2];
+	for (int i = 0; i < 3; i++) printf("V #%d: %f\n", i, phases_velocity_accelerate[i]);
 	// second integration (distance) of each phases' acceleration
-	float phases_distane_accelerate[3] = {
-		(1 / 6.0f) * jerk                    * std::pow(phases_time_accelerate[0], 3),
-		(1 / 2.0f) * acceleration_max_actual * std::pow(phases_time_accelerate[1], 2),
-		(1 / 6.0f) * jerk                    * std::pow(phases_time_accelerate[2], 3)
-	};
-	float distance_accelerate = phases_distane_accelerate[0] + phases_distane_accelerate[1] + phases_distane_accelerate[2];
+	float phases_distane_accelerate[3];
+	phases_distane_accelerate[0] = 0                            + (1 / 6.0f) * jerk                    * std::pow(phases_time_accelerate[0], 3);
+	phases_distane_accelerate[1] = phases_distane_accelerate[0] + (1 / 2.0f) * acceleration_max_actual * std::pow(phases_time_accelerate[1], 2)                                                                                 + phases_velocity_accelerate[0] * phases_time_accelerate[1];
+	phases_distane_accelerate[2] = phases_distane_accelerate[1] - (1 / 6.0f) * jerk                    * std::pow(phases_time_accelerate[2], 3) + (1 / 2.0f) * acceleration_max_actual * std::pow(phases_time_accelerate[2], 2) + phases_velocity_accelerate[1] * phases_time_accelerate[2];
+	for (int i = 0; i < 3; i++) printf("D #%d: %f\n", i, phases_distane_accelerate[i]);
+	float distance_accelerate = phases_distane_accelerate[2];
 	float phases_time_full[7];
 	// check maximum distance reached
 	if (distance_total >= 2 * distance_accelerate) {
 		// we have enough distance, yay!
 		float distance_retain = distance_total - (2 * distance_accelerate);
-		float time_retain = ((-1 * phases_velocity_accelerate[0]) + std::sqrt(std::pow(phases_velocity_accelerate[0], 2) + 2 * acceleration_max_actual * distance_retain)) / acceleration_max_actual;
+		printf("Remain Distance: %f (V=%f)\n", distance_retain, phases_velocity_accelerate[2]);
+		float time_retain = distance_retain / phases_velocity_accelerate[2];
 		float phases_time_full_new[7] = {
 			phases_time_accelerate[0], phases_time_accelerate[1], phases_time_accelerate[2], // accelerate
 			time_retain,                                                                     // retain
@@ -162,6 +163,12 @@ std::map<SigmoidMotionProfile::SigmoidPhase, SigmoidMotionProfile::SigmoidPhaseA
 		std::copy(std::begin(phases_time_full_new), std::end(phases_time_full_new), std::begin(phases_time_full));
 	} else {
 		// fuck off, lazy to make this now
+		float phases_time_full_new[7] = {
+			0.0f, 0.0f, 0.0f, // accelerate
+			0.0f,             // retain
+			0.0f, 0.0f, 0.0f  // decelerate
+		};
+		std::copy(std::begin(phases_time_full_new), std::end(phases_time_full_new), std::begin(phases_time_full));
 	}
 	// cache the time for later user
 	std::map<SigmoidMotionProfile::SigmoidPhase, SigmoidMotionProfile::SigmoidPhaseAnchors> phase_anchors_new;
