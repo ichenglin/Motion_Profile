@@ -37,15 +37,18 @@ public:
 		float cubic_degree_zero;
 	};
 
-	SigmoidMotionProfile                (float distance_total, float velocity_max, float acceleration_max, float jerk);
-	float               get_distance    (float progress_time);
-	float               get_velocity    (float progress_time);
-	float               get_acceleration(float progress_time);
-	float               get_jerk        (float progress_time);
-	float               get_time        (float progress_distance);
-	float               get_time_end    ();
-	SigmoidPhase        get_phase       (float progress_time);
-	SigmoidPhaseAnchors get_anchors     (SigmoidPhase anchor_phase);
+	SigmoidMotionProfile                          (float distance_total, float velocity_max, float acceleration_max, float jerk);
+	float               get_distance_velocity     (float progress_distance);
+	float               get_distance_acceleration (float progress_distance);
+	float               get_distance_jerk         (float progress_distance);
+	float               get_distance_time         (float progress_distance);
+	float               get_time_distance         (float progress_time);
+	float               get_time_velocity         (float progress_time);
+	float               get_time_acceleration     (float progress_time);
+	float               get_time_jerk             (float progress_time);
+	float               get_time_end              ();
+	SigmoidPhase        get_phase                 (float progress_time);
+	SigmoidPhaseAnchors get_anchors               (SigmoidPhase anchor_phase);
 private:
 	float distance_total;
 	float velocity_max;

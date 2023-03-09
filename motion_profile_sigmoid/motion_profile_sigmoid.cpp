@@ -21,19 +21,34 @@ SigmoidMotionProfile::SigmoidMotionProfile(float distance_total, float velocity_
 	this->phase_anchors           = sigmoid_phase_anchors_distance(this);
 }
 
-float SigmoidMotionProfile::get_distance(float progress_time) {
-	return this->sigmoid_value(SigmoidParameter::DISTANCE, progress_time);
-}
-
-float SigmoidMotionProfile::get_velocity(float progress_time) {
+float SigmoidMotionProfile::get_distance_velocity(float progress_distance) {
+	float progress_time = SigmoidMotionProfile::get_distance_time(progress_distance);
 	return this->sigmoid_value(SigmoidParameter::VELOCITY, progress_time);
 }
 
-float SigmoidMotionProfile::get_acceleration(float progress_time) {
+float SigmoidMotionProfile::get_distance_acceleration(float progress_distance) {
+	float progress_time = SigmoidMotionProfile::get_distance_time(progress_distance);
 	return this->sigmoid_value(SigmoidParameter::ACCELERATION, progress_time);
 }
 
-float SigmoidMotionProfile::get_jerk(float progress_time) {
+float SigmoidMotionProfile::get_distance_jerk(float progress_distance) {
+	float progress_time = SigmoidMotionProfile::get_distance_time(progress_distance);
+	return this->sigmoid_value(SigmoidParameter::JERK, progress_time);
+}
+
+float SigmoidMotionProfile::get_time_distance(float progress_time) {
+	return this->sigmoid_value(SigmoidParameter::DISTANCE, progress_time);
+}
+
+float SigmoidMotionProfile::get_time_velocity(float progress_time) {
+	return this->sigmoid_value(SigmoidParameter::VELOCITY, progress_time);
+}
+
+float SigmoidMotionProfile::get_time_acceleration(float progress_time) {
+	return this->sigmoid_value(SigmoidParameter::ACCELERATION, progress_time);
+}
+
+float SigmoidMotionProfile::get_time_jerk(float progress_time) {
 	return this->sigmoid_value(SigmoidParameter::JERK, progress_time);
 }
 
@@ -49,7 +64,7 @@ SigmoidMotionProfile::SigmoidPhaseAnchors SigmoidMotionProfile::get_anchors(Sigm
 	return this->phase_anchors.at(anchor_phase);
 }
 
-float SigmoidMotionProfile::get_time(float progress_distance) {
+float SigmoidMotionProfile::get_distance_time(float progress_distance) {
 	SigmoidMotionProfile::SigmoidPhase        progress_phase;
 	SigmoidMotionProfile::SigmoidPhaseAnchors progress_phase_anchor;
 	for (int phase_index = 6; phase_index >= 0; phase_index--) {
@@ -70,7 +85,7 @@ float SigmoidMotionProfile::get_time(float progress_distance) {
 		{SigmoidPhase::DECELERATE_END,    {((1.0f/6) * this->jerk),  ((-1.0f/2) * this->acceleration_max_actual), 0.0f, 0.0f}}
 	};
 	SigmoidCubicConstants progress_phase_constants        =  phase_cubic_constants.at(progress_phase);
-	progress_phase_constants.cubic_degree_first           += this->get_velocity(progress_phase_anchor.time_phase_begin);
+	progress_phase_constants.cubic_degree_first           += this->get_time_velocity(progress_phase_anchor.time_phase_begin);
 	progress_phase_constants.cubic_degree_zero            -= progress_distance_section;
 	std::vector<std::complex<float>> phase_cubic_solution =  sigmoid_cubic_solve(progress_phase_constants);
 	float progress_time                                   =  0.0f;
@@ -226,7 +241,7 @@ std::map<SigmoidMotionProfile::SigmoidPhase, SigmoidMotionProfile::SigmoidPhaseA
 	float distance_phase_begin = 0.0f;
 	for (int phase_index = 0; phase_index < 7; phase_index++) {
 		SigmoidMotionProfile::SigmoidPhaseAnchors phase_anchor       = sigmoid_motion_profile->get_anchors((SigmoidMotionProfile::SigmoidPhase) phase_index);
-		float                                     distance_phase_end = sigmoid_motion_profile->get_distance(phase_anchor.time_phase_end);
+		float                                     distance_phase_end = sigmoid_motion_profile->get_time_distance(phase_anchor.time_phase_end);
 		phase_distance_new.insert(std::pair<SigmoidMotionProfile::SigmoidPhase, SigmoidMotionProfile::SigmoidPhaseAnchors>((SigmoidMotionProfile::SigmoidPhase) phase_index, {
 			phase_anchor.time_phase_begin,
 			phase_anchor.time_phase_section,
