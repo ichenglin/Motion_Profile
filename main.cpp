@@ -11,8 +11,9 @@ int main() {
     float value_last = 0.0f;
     for (float progress_percentage = 0.0f; progress_percentage <= 1; progress_percentage += 0.02f) {
         float progress_value = motion_profile.get_distance(time_full * progress_percentage);
-        printf("Phase: %d Time: %08.3f Value: %08.3f (+ %08.3f) |   O", motion_profile.get_phase(time_full * progress_percentage), time_full * progress_percentage, progress_value, progress_value - value_last);
-        for (int spacing = 1; spacing < std::abs(progress_value / (500 / 90.0f)); spacing++) printf("X");
+        float progress_time_traced = motion_profile.get_time(progress_value);
+        printf("Phase: %d Time: %08.3f Traced: %08.3f Value: %08.3f (+ %08.3f) |   O", motion_profile.get_phase(time_full * progress_percentage), time_full * progress_percentage, progress_time_traced, progress_value, progress_value - value_last);
+        for (int spacing = 1; spacing < std::abs(progress_value / (300 / 40.0f)); spacing++) printf("X");
         printf("\n");
         value_last = progress_value;
     }

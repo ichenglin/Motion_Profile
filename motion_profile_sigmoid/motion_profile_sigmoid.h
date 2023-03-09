@@ -22,18 +22,30 @@ public:
 	};
 
 	struct SigmoidPhaseAnchors {
-		float time_phase_begin;   // time the phase begins
-		float time_phase_section; // time the phase last
-		float time_phase_end;     // time the phase ends
+		float time_phase_begin;       // time the phase begins
+		float time_phase_section;     // time the phase last
+		float time_phase_end;         // time the phase ends
+		float distance_phase_begin;   // distance the phase begins
+		float distance_phase_section; // distance the phase last
+		float distance_phase_end;     // distance the phase ends
 	};
 
-	SigmoidMotionProfile(float distance_total, float velocity_max, float acceleration_max, float jerk);
-	float get_distance(float progress_time);
-	float get_velocity(float progress_time);
-	float get_acceleration(float progress_time);
-	float get_jerk(float progress_time);
-	float get_time_end();
-	SigmoidPhase get_phase(float progress_time);
+	struct SigmoidCubicConstants {
+		float cubic_degree_third;
+		float cubic_degree_second;
+		float cubic_degree_first;
+		float cubic_degree_zero;
+	};
+
+	SigmoidMotionProfile                (float distance_total, float velocity_max, float acceleration_max, float jerk);
+	float               get_distance    (float progress_time);
+	float               get_velocity    (float progress_time);
+	float               get_acceleration(float progress_time);
+	float               get_jerk        (float progress_time);
+	float               get_time        (float progress_distance);
+	float               get_time_end    ();
+	SigmoidPhase        get_phase       (float progress_time);
+	SigmoidPhaseAnchors get_anchors     (SigmoidPhase anchor_phase);
 private:
 	float distance_total;
 	float velocity_max;

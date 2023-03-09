@@ -18,9 +18,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sigmoid_motion_profile\sigmoid_motion_profile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="motion_profile_sigmoid\motion_profile_sigmoid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -29,9 +26,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sigmoid_motion_profile\sigmoid_motion_profile.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="motion_profile_sigmoid\motion_profile_sigmoid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
